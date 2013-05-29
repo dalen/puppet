@@ -128,10 +128,10 @@ class Puppet::Parser::Lexer
 
   TOKENS = TokenList.new
   TOKENS.add_tokens(
-    '['   => :LBRACK,
-    ']'   => :RBRACK,
-    '{'   => :LBRACE,
-    '}'   => :RBRACE,
+    %r{\[|<:}   => :LBRACK,
+    %r{\]|:>}   => :RBRACK,
+    %r{\{|<%}   => :LBRACE,
+    %r{\}|%>}   => :RBRACE,
     '('   => :LPAREN,
     ')'   => :RPAREN,
     '='   => :EQUALS,
@@ -228,7 +228,7 @@ class Puppet::Parser::Lexer
     TOKENS[name_token].acceptable_when Contextual::NOT_INSIDE_QUOTES
   end
 
-  TOKENS.add_token :COMMENT, %r{#.*}, :accumulate => true, :skip => true do |lexer,value|
+  TOKENS.add_token :COMMENT, %r{(:?#|%:).*}, :accumulate => true, :skip => true do |lexer,value|
     value.sub!(/# ?/,'')
     [self, value]
   end
