@@ -179,7 +179,6 @@ class Puppet::Parser::Lexer
 
   module Contextual
     QUOTE_TOKENS = [:DQPRE,:DQMID]
-    REGEX_INTRODUCING_TOKENS = [:NODE,:LBRACE,:RBRACE,:MATCH,:NOMATCH,:COMMA]
 
     NOT_INSIDE_QUOTES = Proc.new do |context|
       !QUOTE_TOKENS.include? context[:after]
@@ -187,10 +186,6 @@ class Puppet::Parser::Lexer
 
     INSIDE_QUOTES = Proc.new do |context|
       QUOTE_TOKENS.include? context[:after]
-    end
-
-    IN_REGEX_POSITION = Proc.new do |context|
-      REGEX_INTRODUCING_TOKENS.include? context[:after]
     end
 
     IN_STRING_INTERPOLATION = Proc.new do |context|
@@ -249,7 +244,6 @@ class Puppet::Parser::Lexer
     regex = value.sub(%r{\A/}, "").sub(%r{/\Z}, '').gsub("\\/", "/")
     [self, Regexp.new(regex)]
   end
-  TOKENS[:REGEX].acceptable_when Contextual::IN_REGEX_POSITION
 
   TOKENS.add_token :RETURN, "\n", :skip => true, :incr_line => true, :skip_text => true
 

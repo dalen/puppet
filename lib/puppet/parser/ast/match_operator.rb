@@ -15,6 +15,7 @@ class Puppet::Parser::AST
     # of lval and rval operands
     def evaluate(scope)
       lval = @lval.safeevaluate(scope)
+      rval = @lval.safeevaluate(scope)
 
       return(rval.evaluate_match(lval, scope) ? @operator == "=~" : @operator == "!~")
     end
