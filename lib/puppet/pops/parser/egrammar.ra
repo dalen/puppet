@@ -58,6 +58,12 @@ program
   : statements { result = Factory.block_or_expression(*val[0]) }
   | nil
 
+block
+  : LBRACE statements RBRACE { result = val[1]}
+
+empty_block
+  : LBRACE RBRACE { result = nil }
+
 # Produces a semantic model (non validated, but semantically adjusted).
 statements
   : syntactic_statements { result = transform_calls(val[0]) }
@@ -215,8 +221,8 @@ lambda_j8
     }
 
 lambda_rest
-  : LBRACE statements RBRACE { result = val[1] }
-  | LBRACE RBRACE { result = nil }
+  : block
+  | empty_block
 
 optional_farrow
   : nil
@@ -253,13 +259,13 @@ if_expression
 
   # Produces Model::IfExpression
   if_part
-    : expression LBRACE statements RBRACE else {
-        result = Factory.IF(val[0], Factory.block_or_expression(*val[2]), val[4])
-        loc(result, val[0], (val[4] ? val[4] : val[3]))
+    : expression block else {
+        result = Factory.IF(val[0], Factory.block_or_expression(*val[1]), val[2])
+        loc(result, val[0], (val[2] ? val[2] : val[1]))
       }
-    | expression LBRACE RBRACE else {
-        result = Factory.IF(val[0], nil, val[3])
-        loc(result, val[0], (val[3] ? val[3] : val[2]))
+    | expression empty_block else {
+        result = Factory.IF(val[0], nil, val[2])
+        loc(result, val[0], (val[2] ? val[2] : val[1]))
       }
 
   # Produces [Model::Expression, nil] - nil if there is no else or elsif part
@@ -269,9 +275,9 @@ if_expression
         result = val[1]
         loc(result, val[0], val[1])
       }
-    | ELSE LBRACE statements RBRACE {
-        result = Factory.block_or_expression(*val[2])
-        loc result, val[0], val[3]
+    | ELSE block {
+        result = Factory.block_or_expression(*val[1])
+        loc result, val[0], val[1]
       }
     | ELSE LBRACE RBRACE {
         result = nil # don't think a nop is needed here either
@@ -282,13 +288,13 @@ if_expression
 # Changed from Puppet 3x where there is no else part on unless
 #
 unless_expression
-  : UNLESS expression LBRACE statements RBRACE unless_else {
-      result = Factory.UNLESS(val[1], Factory.block_or_expression(*val[3]), val[5])
-      loc result, val[0], val[4]
+  : UNLESS expression block unless_else {
+      result = Factory.UNLESS(val[1], Factory.block_or_expression(*val[2]), val[3])
+      loc result, val[0], val[2]
     }
-  | UNLESS expression LBRACE RBRACE unless_else {
+  | UNLESS expression empty_block unless_else {
       result = Factory.UNLESS(val[1], nil, nil)
-      loc result, val[0], val[4]
+      loc result, val[0], val[3]
     }
 
   # Different from else part of if, since "elsif" is not supported, but 'else' is
@@ -296,11 +302,11 @@ unless_expression
   # Produces [Model::Expression, nil] - nil if there is no else or elsif part
   unless_else
     : # nothing
-    | ELSE LBRACE statements RBRACE {
-        result = Factory.block_or_expression(*val[2])
-        loc result, val[0], val[3]
+    | ELSE block {
+        result = Factory.block_or_expression(*val[1])
+        loc result, val[0], val[1]
       }
-    | ELSE LBRACE RBRACE {
+    | ELSE empty_block {
         result = nil # don't think a nop is needed here either
       }
 
@@ -320,13 +326,13 @@ case_expression
 
   # Produced Model::CaseOption (aka When)
   case_option
-    : expressions case_colon LBRACE statements RBRACE {
-        result = Factory.WHEN(val[0], val[3])
-        loc result, val[1], val[4]
+    : expressions case_colon block {
+        result = Factory.WHEN(val[0], val[2])
+        loc result, val[1], val[2]
       }
-    | expressions case_colon LBRACE RBRACE = LOW {
+    | expressions case_colon empty_block = LOW {
         result = Factory.WHEN(val[0], nil)
-        loc result, val[1], val[3]
+        loc result, val[1], val[2]
       }
 
   case_colon: COLON =CASE_COLON { result = val[0] }
@@ -508,14 +514,14 @@ attribute_operations
 # Produces Model::Definition
 #
 definition_expression
-  : DEFINE classname parameter_list LBRACE statements RBRACE {
-      result = Factory.DEFINITION(classname(val[1][:value]), val[2], val[4])
-      loc result, val[0], val[5]
+  : DEFINE classname parameter_list block {
+      result = Factory.DEFINITION(classname(val[1][:value]), val[2], val[3])
+      loc result, val[0], val[3]
       @lexer.indefine = false
     }
-  | DEFINE classname parameter_list LBRACE RBRACE {
+  | DEFINE classname parameter_list empty_block {
       result = Factory.DEFINITION(classname(val[1][:value]), val[2], nil)
-      loc result, val[0], val[4]
+      loc result, val[0], val[3]
       @lexer.indefine = false
     }
 
@@ -528,15 +534,15 @@ definition_expression
 # Produces Model::HostClassDefinition
 #
 hostclass_expression
-  : CLASS classname parameter_list classparent LBRACE statements RBRACE {
+  : CLASS classname parameter_list classparent block {
       @lexer.namepop
-      result = Factory.HOSTCLASS(classname(val[1][:value]), val[2], token_text(val[3]), val[5])
-      loc result, val[0], val[6]
+      result = Factory.HOSTCLASS(classname(val[1][:value]), val[2], token_text(val[3]), val[4])
+      loc result, val[0], val[3]
     }
-  | CLASS classname parameter_list classparent LBRACE RBRACE {
+  | CLASS classname parameter_list classparent empty_block {
       @lexer.namepop
       result = Factory.HOSTCLASS(classname(val[1][:value]), val[2], token_text(val[3]), nil)
-      loc result, val[0], val[5]
+      loc result, val[0], val[3]
       }
 
   # Produces String, name or nil result
@@ -558,13 +564,13 @@ hostclass_expression
 # Produces Model::NodeDefinition
 #
 node_definition_expression
-  : NODE hostnames nodeparent LBRACE statements RBRACE {
-      result = Factory.NODE(val[1], val[2], val[4])
-      loc result, val[0], val[5]
+  : NODE hostnames nodeparent block {
+      result = Factory.NODE(val[1], val[2], val[3])
+      loc result, val[0], val[3]
     }
-  | NODE hostnames nodeparent LBRACE RBRACE {
+  | NODE hostnames nodeparent empty_block {
       result = Factory.NODE(val[1], val[2], nil)
-      loc result, val[0], val[4]
+      loc result, val[0], val[3]
     }
 
   # Hostnames is not a list of names, it is a list of name matchers (including a Regexp).
@@ -580,7 +586,7 @@ node_definition_expression
   # String with interpolation is validated for better error message
   hostname
     : NAME        { result = Factory.fqn(val[0][:value]); loc result, val[0] }
-    | quotedtext  { result = val[0] } 
+    | quotedtext  { result = val[0] }
     | DEFAULT     { result = Factory.literal(:default); loc result, val[0] }
     | regex
 
