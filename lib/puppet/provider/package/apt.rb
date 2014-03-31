@@ -65,6 +65,7 @@ Puppet::Type.type(:package).provide :apt, :parent => :dpkg, :source => :dpkg do
 
     cmd << :install << str
 
+    waitforlock
     aptget(*cmd)
   end
 
@@ -95,11 +96,13 @@ Puppet::Type.type(:package).provide :apt, :parent => :dpkg, :source => :dpkg do
 
   def uninstall
     self.run_preseed if @resource[:responsefile]
+    waitforlock
     aptget "-y", "-q", :remove, @resource[:name]
   end
 
   def purge
     self.run_preseed if @resource[:responsefile]
+    waitforlock
     aptget '-y', '-q', :remove, '--purge', @resource[:name]
     # workaround a "bug" in apt, that already removed packages are not purged
     super

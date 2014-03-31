@@ -10,6 +10,7 @@ Puppet::Type.type(:package).provide :dpkg, :parent => Puppet::Provider::Package 
   commands :dpkg => "/usr/bin/dpkg"
   commands :dpkg_deb => "/usr/bin/dpkg-deb"
   commands :dpkgquery => "/usr/bin/dpkg-query"
+  commands :fuser => "/bin/fuser"
 
   # Performs a dpkgquery call with a pipe so that output can be processed
   # inline in a passed block.
@@ -77,6 +78,29 @@ Puppet::Type.type(:package).provide :dpkg, :parent => Puppet::Provider::Package 
 
   public
 
+  # Check if the dpkg lock is taken
+  # @return true if locked, false if not
+  def checkforlock
+    begin
+      fuser('-s', '/var/lib/dpkg/lock')
+      return true
+    rescue Puppet::ExecutionFailure
+      return false
+    end
+  end
+
+  # Wait until the lock is free
+  def waitforlock
+    require 'timeout'
+
+    Timeout::timeout(120) do
+      while checkforlock do
+        Puppet.debug "Waiting for DPkg lock"
+        sleep 1
+      end
+    end
+  end
+
   def install
     unless file = @resource[:source]
       raise ArgumentError, "You cannot install dpkg packages without a source"
@@ -94,6 +118,7 @@ Puppet::Type.type(:package).provide :dpkg, :parent => Puppet::Provider::Package 
     end
     args << '-i' << file
 
+    waitforlock
     dpkg(*args)
   end
 
@@ -138,10 +163,12 @@ Puppet::Type.type(:package).provide :dpkg, :parent => Puppet::Provider::Package 
   end
 
   def uninstall
+    waitforlock
     dpkg "-r", @resource[:name]
   end
 
   def purge
+    waitforlock
     dpkg "--purge", @resource[:name]
   end
 
