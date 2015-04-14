@@ -107,7 +107,7 @@ class Puppet::Graph::RelationshipGraph < Puppet::Graph::SimpleGraph
 
     enqueue_roots
 
-    deferred_resources = []
+    deferred_resources = Queue.new
 
     while continue_while.call() && (resource = next_resource)
       if resource.suitable?
@@ -122,18 +122,17 @@ class Puppet::Graph::RelationshipGraph < Puppet::Graph::SimpleGraph
         deferred_resources << resource
       end
 
-      if @ready.empty? and deferred_resources.any?
+      if @ready.empty? and !deferred_resources.empty?
+        res = deferred_resources.pop
         if made_progress
-          enqueue(*deferred_resources)
+          # TODO: enqueue everything on the queue to make sure we can make progress on something
+          enqueue(res)
         else
-          deferred_resources.each do |res|
-            overly_deferred_resource_handler.call(res)
-            finish(res)
-          end
+          overly_deferred_resource_handler.call(res)
+          finish(res)
         end
 
         made_progress = false
-        deferred_resources = []
       end
     end
 
